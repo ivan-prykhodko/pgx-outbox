@@ -6,9 +6,7 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("outbox message not found")
-	// Deprecated
-	ErrTxUnsupportedType    = errors.New("unsupported transaction type")
+	ErrNotFound             = errors.New("outbox message not found")
 	ErrTxNil                = errors.New("transaction is nil")
 	ErrNetwork              = errors.New("network error")
 	ErrMessageSerialization = errors.New("message serialization error")

@@ -11,6 +11,7 @@ const (
 	StatusFailed     Status = "FAILED"
 )
 
+// Message represents an outbox entry to be processed.
 type Message struct {
 	ID            int64             `db:"id"`
 	AggregateType string            `db:"aggregate_type"`

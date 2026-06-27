@@ -5,7 +5,9 @@ import (
 	"fmt"
 )
 
+// Dispatcher handles message routing and publishing.
 type Dispatcher interface {
+	// Dispatch routes the message and publishes it using the configured publisher.
 	Dispatch(ctx context.Context, msg *Message) error
 }
 
@@ -40,6 +42,7 @@ func (d *dispatcher) Dispatch(ctx context.Context, msg *Message) error {
 	return nil
 }
 
+// buildEnvelope resolves the route and wraps the message into an envelope.
 func (d *dispatcher) buildEnvelope(msg *Message) (Envelope, error) {
 	route, err := d.router.Resolve(msg)
 	if err != nil {

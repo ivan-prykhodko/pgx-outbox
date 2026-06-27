@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Worker polls the repository and dispatches messages to their destinations.
 type Worker struct {
 	repo       Repository
 	dispatcher Dispatcher
@@ -38,6 +39,7 @@ func NewWorker(
 	}
 }
 
+// Run starts the worker loop until the context is cancelled.
 func (w *Worker) Run(ctx context.Context) {
 	w.logger.Info("outbox worker started")
 	defer w.logger.Info("outbox worker stopped")
@@ -57,6 +59,7 @@ func (w *Worker) Run(ctx context.Context) {
 	}
 }
 
+// process executes a single processing cycle with error handling and retry sleep.
 func (w *Worker) process(ctx context.Context) {
 	if err := w.doProcess(ctx); err != nil {
 		w.logger.Error("outbox processing failed",
@@ -71,6 +74,7 @@ func (w *Worker) process(ctx context.Context) {
 	}
 }
 
+// doProcess claims pending messages and handles each one.
 func (w *Worker) doProcess(ctx context.Context) error {
 	msgs, err := w.repo.ClaimPending(ctx, w.limit)
 	if err != nil {
@@ -90,6 +94,7 @@ func (w *Worker) doProcess(ctx context.Context) error {
 	return nil
 }
 
+// handle dispatches a single message and marks it as published or failed.
 func (w *Worker) handle(ctx context.Context, msg *Message) error {
 	var err error
 

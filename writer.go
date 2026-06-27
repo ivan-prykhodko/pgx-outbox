@@ -8,7 +8,9 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// Writer defines the interface for persisting outbox messages.
 type Writer interface {
+	// Write inserts a message into the outbox table within the provided transaction.
 	Write(ctx context.Context, tx RowQuerier, msg *Message) (int64, error)
 }
 
@@ -39,6 +41,7 @@ INSERT INTO %s (
 	}
 }
 
+// Write executes the insert query using the provided transaction and message data.
 func (w writer) Write(ctx context.Context, tx RowQuerier, msg *Message) (int64, error) {
 	if tx == nil {
 		return 0, ErrTxNil
@@ -65,14 +68,18 @@ func (w writer) Write(ctx context.Context, tx RowQuerier, msg *Message) (int64, 
 	return id, nil
 }
 
+// RowQuerier abstracts the database connection to support different transaction types.
 type RowQuerier interface {
+	// QueryRow executes a query that is expected to return at most one row.
 	QueryRow(ctx context.Context, query string, args ...any) pgx.Row
 }
 
+// SqlRowQuerier wraps standard library sql.Tx to implement RowQuerier.
 type SqlRowQuerier struct {
 	*sql.Tx
 }
 
+// QueryRow satisfies RowQuerier interface using QueryRowContext.
 func (w SqlRowQuerier) QueryRow(ctx context.Context, query string, args ...any) pgx.Row {
 	return w.QueryRowContext(ctx, query, args...)
 }

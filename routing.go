@@ -2,15 +2,19 @@ package outbox
 
 import "fmt"
 
+// Route contains destination information for a message.
 type Route struct {
 	Topic          string
 	Key            string
 	IdempotencyKey string
 }
 
+// RouteResolver is a function that determines the route for a given message.
 type RouteResolver func(msg *Message) (Route, error)
 
+// Router resolves messages to their destination routes.
 type Router interface {
+	// Resolve returns a route for the given message.
 	Resolve(msg *Message) (Route, error)
 }
 
