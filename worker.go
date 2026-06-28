@@ -8,39 +8,40 @@ import (
 )
 
 // Worker polls the repository and dispatches messages to their destinations.
-type Worker struct {
-	repo       Repository
-	dispatcher Dispatcher
+type Worker interface {
+	Run(ctx context.Context)
+}
+
+type worker struct {
+	reader     Reader
+	processor  Processor
 	interval   time.Duration
-	limit      int
-	errorSleep time.Duration
+	retrySleep time.Duration // simple timeout for transient errors
 	logger     *slog.Logger
 }
 
 func NewWorker(
-	repo Repository,
-	dispatcher Dispatcher,
+	reader Reader,
+	processor Processor,
 	interval time.Duration,
-	limit int,
-	errorSleep time.Duration,
+	retrySleep time.Duration,
 	logger *slog.Logger,
 ) Worker {
 	if logger == nil {
 		logger = slog.Default()
 	}
 
-	return Worker{
-		repo:       repo,
-		dispatcher: dispatcher,
+	return &worker{
+		reader:     reader,
+		processor:  processor,
 		interval:   interval,
-		limit:      limit,
-		errorSleep: errorSleep,
+		retrySleep: retrySleep,
 		logger:     logger,
 	}
 }
 
 // Run starts the worker loop until the context is cancelled.
-func (w *Worker) Run(ctx context.Context) {
+func (w *worker) Run(ctx context.Context) {
 	w.logger.Info("outbox worker started")
 	defer w.logger.Info("outbox worker stopped")
 
@@ -60,56 +61,35 @@ func (w *Worker) Run(ctx context.Context) {
 }
 
 // process executes a single processing cycle with error handling and retry sleep.
-func (w *Worker) process(ctx context.Context) {
+func (w *worker) process(ctx context.Context) {
 	if err := w.doProcess(ctx); err != nil {
 		w.logger.Error("outbox processing failed",
 			slog.Any("error", err),
 		)
 		if isRetryable(err) {
 			w.logger.Info("retrying after sleep due to transient error",
-				slog.Duration("duration", w.errorSleep),
+				slog.Duration("duration", w.retrySleep),
 			)
-			time.Sleep(w.errorSleep)
+			time.Sleep(w.retrySleep)
 		}
 	}
 }
 
-// doProcess claims pending messages and handles each one.
-func (w *Worker) doProcess(ctx context.Context) error {
-	msgs, err := w.repo.ClaimPending(ctx, w.limit)
+// doProcess retrieves messages and handles each one.
+func (w *worker) doProcess(ctx context.Context) error {
+	msgsCh, err := w.reader.Read(ctx)
 	if err != nil {
-		return fmt.Errorf("claim pending messages: %w", err)
+		return fmt.Errorf("read messages: %w", err)
 	}
 
-	for _, msg := range msgs {
+	for msg := range msgsCh {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		if err := w.handle(ctx, msg); err != nil {
+		if err := w.processor.Process(ctx, &msg); err != nil {
 			return fmt.Errorf("process message %d (%s): %w", msg.ID, msg.EventType, err)
 		}
-	}
-
-	return nil
-}
-
-// handle dispatches a single message and marks it as published or failed.
-func (w *Worker) handle(ctx context.Context, msg *Message) error {
-	var err error
-
-	if err = w.dispatcher.Dispatch(ctx, msg); err != nil {
-		if isRetryable(err) {
-			return err
-		}
-
-		// TODO: retry strategy on serialization error?
-
-		return w.repo.MarkFailed(ctx, msg.ID, err)
-	}
-
-	if err = w.repo.MarkPublished(ctx, msg.ID); err != nil {
-		return fmt.Errorf("mark published: %w", err)
 	}
 
 	return nil
