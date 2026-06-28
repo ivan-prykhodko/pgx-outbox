@@ -96,7 +96,7 @@ func startOutboxWorker(ctx context.Context, pool *pgxpool.Pool) {
     })
 
     // 2. Initialize components
-    repo := outbox.NewPgxRepository(pool)
+    repo := outbox.NewRepository(pool)
     publisher := &MyKafkaPublisher{} // Implements outbox.Publisher
     dispatcher := outbox.NewDispatcher(publisher, router)
 
