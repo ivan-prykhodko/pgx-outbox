@@ -85,7 +85,9 @@ import (
 )
 
 func startOutboxWorker(ctx context.Context, pool *pgxpool.Pool) {
-    // 1. Define how to route messages to topics
+    // 1. Initialize components
+    repo := outbox.NewRepository(pool)
+    publisher := &MyKafkaPublisher{} // Implements outbox.Publisher
     router := outbox.NewRouter(map[string]outbox.RouteResolver{
         outbox.RouteName("Order", "OrderCreated"): func(msg *outbox.Message) (outbox.Route, error) {
             return outbox.Route{
@@ -94,20 +96,18 @@ func startOutboxWorker(ctx context.Context, pool *pgxpool.Pool) {
             }, nil
         },
     })
-
-    // 2. Initialize components
-    repo := outbox.NewRepository(pool)
-    publisher := &MyKafkaPublisher{} // Implements outbox.Publisher
     dispatcher := outbox.NewDispatcher(publisher, router)
 
-    // 3. Start the worker
+    reader := outbox.NewPollReader(repo, 100) // Batch limit 100
+    processor := outbox.NewDefaultProcessor(repo, dispatcher)
+
+    // 2. Start the worker
     worker := outbox.NewWorker(
-        repo,
-        dispatcher,
-        1*time.Second,  // Polling interval
-        100,            // Batch limit
-        5*time.Second,  // Sleep on error
-        nil,            // Default logger
+        reader,
+        processor,
+        1*time.Second, // Polling interval
+        5*time.Second, // Sleep on error
+        nil,           // Default logger
     )
 
     worker.Run(ctx)
@@ -118,8 +118,10 @@ func startOutboxWorker(ctx context.Context, pool *pgxpool.Pool) {
 
 - **Writer**: Used in your application code to insert messages.
 - **Repository**: Handles fetching and updating message status in the database.
+- **Reader**: Responsible for reading pending messages from the repository (e.g., via polling).
+- **Processor**: Handles the processing logic for individual messages.
 - **Publisher**: You must provide an implementation of the `Publisher` interface (e.g., for Kafka, RabbitMQ, or SNS).
-- **Worker**: Orchestrates the polling and dispatching process.
+- **Worker**: Orchestrates the polling and dispatching process using a Reader and Processor.
 
 ## Error Handling & Retries
 
