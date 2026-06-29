@@ -7,7 +7,7 @@ A Go library implementing the Transactional Outbox pattern using `pgx` (Go 1.25+
 - **Transactional Integrity**: Save domain events and business data changes in a single atomic operation.
 - **Reliable Delivery**: Background worker ensures messages are eventually published even if the external system is temporarily unavailable.
 - **Pgx Integration**: Built specifically for `github.com/jackc/pgx/v5`.
-- **Flexible Routing**: Custom resolvers to map internal events to external topics/keys.
+- **Flexible Routing**: Custom resolvers to map internal events to external queue/topics/keys.
 
 ## Database Schema
 
@@ -90,10 +90,11 @@ func startOutboxWorker(ctx context.Context, pool *pgxpool.Pool) {
     publisher := &MyKafkaPublisher{} // Implements outbox.Publisher
     router := outbox.NewRouter(map[string]outbox.RouteResolver{
         outbox.RouteName("Order", "OrderCreated"): func(msg *outbox.Message) (outbox.Route, error) {
-            return outbox.Route{
-                Topic: "orders.events",
-                Key:   msg.AggregateID,
-            }, nil
+            return newMyRoute(
+				"order", // Topic
+			    "some-key", // Key
+			    fmt.Sprintf("outbox:%s:%s:%s:%d", msg.AggregateType, msg.AggregateID, msg.EventType, msg.ID), // Idempotency key
+            ), nil
         },
     })
     dispatcher := outbox.NewDispatcher(publisher, router)
