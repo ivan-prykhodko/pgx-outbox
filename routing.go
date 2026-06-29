@@ -3,10 +3,8 @@ package outbox
 import "fmt"
 
 // Route contains destination information for a message.
-type Route struct {
-	Topic          string
-	Key            string
-	IdempotencyKey string
+type Route interface {
+	Data() map[string]any
 }
 
 // RouteResolver is a function that determines the route for a given message.
@@ -33,7 +31,7 @@ func (r *router) Resolve(msg *Message) (Route, error) {
 
 	resolver, ok := r.resolvers[routeName]
 	if !ok {
-		return Route{}, fmt.Errorf("no route resolver for %s", routeName)
+		return nil, fmt.Errorf("no route resolver for %s", routeName)
 	}
 
 	return resolver(msg)

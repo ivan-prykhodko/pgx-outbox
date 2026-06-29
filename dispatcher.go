@@ -31,10 +31,10 @@ func (d *dispatcher) Dispatch(ctx context.Context, msg *Message) error {
 
 	if err := d.publisher.Publish(ctx, env); err != nil {
 		return fmt.Errorf(
-			"dispatch message id=%d event=%s topic=%s: %w",
+			"dispatch message id=%d event=%s route=%v: %w",
 			msg.ID,
 			msg.EventType,
-			env.Topic,
+			env.Route,
 			err,
 		)
 	}
@@ -50,9 +50,7 @@ func (d *dispatcher) buildEnvelope(msg *Message) (Envelope, error) {
 	}
 
 	return Envelope{
-		Topic:          route.Topic,
-		Key:            route.Key,
-		Message:        *msg,
-		IdempotencyKey: route.IdempotencyKey,
+		Route:   route,
+		Message: *msg,
 	}, nil
 }
