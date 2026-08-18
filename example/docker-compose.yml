@@ -1,0 +1,32 @@
+services:
+  app:
+    image: golang:1.26-alpine
+    restart: unless-stopped
+    working_dir: /srv/example
+    volumes:
+      - ../:/srv
+    depends_on:
+      - app_database
+    networks:
+      - default_network
+    command: ["go", "run", "/srv/example/main.go"]
+
+  app_database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    volumes:
+      - app_database:/var/lib/postgresql/data:delegated
+    ports:
+      - "54321:5432"
+    environment:
+      POSTGRES_PASSWORD: db_password
+      POSTGRES_USER: db_user
+      POSTGRES_DB: db_name
+    networks:
+      - default_network
+
+volumes:
+  app_database:
+
+networks:
+  default_network:
