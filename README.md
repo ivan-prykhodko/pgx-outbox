@@ -67,7 +67,7 @@ func CreateOrder(ctx context.Context, pool *pgxpool.Pool, order Order) error {
 
         // 3. Write to outbox within the same transaction
         writer := outbox.NewWriter("outbox_messages")
-        _, err := writer.Write(ctx, tx, &msg)
+        _, err := writer.Write(ctx, tx, msg)
         return err
     })
 }
@@ -127,6 +127,12 @@ func startOutboxWorker(ctx context.Context, pool *pgxpool.Pool) {
 ## Error Handling & Retries
 
 The worker handles transient errors (like network issues) by sleeping for a configured duration before retrying. If a message fails due to a non-retryable error (e.g., routing failure), it is marked as `FAILED` with the error message recorded in the database.
+
+## TODO
+
+- [x] Add examples
+- [ ] Add filter by aggregate type
+- [ ] Add WAL support
 
 ## License
 
