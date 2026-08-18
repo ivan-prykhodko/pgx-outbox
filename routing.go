@@ -8,12 +8,12 @@ type Route interface {
 }
 
 // RouteResolver is a function that determines the route for a given message.
-type RouteResolver func(msg *Message) (Route, error)
+type RouteResolver func(msg Message) (Route, error)
 
 // Router resolves messages to their destination routes.
 type Router interface {
 	// Resolve returns a route for the given message.
-	Resolve(msg *Message) (Route, error)
+	Resolve(msg Message) (Route, error)
 }
 
 type router struct {
@@ -26,7 +26,7 @@ func NewRouter(resolvers map[string]RouteResolver) Router {
 	}
 }
 
-func (r *router) Resolve(msg *Message) (Route, error) {
+func (r *router) Resolve(msg Message) (Route, error) {
 	routeName := RouteName(msg.AggregateType, msg.EventType)
 
 	resolver, ok := r.resolvers[routeName]

@@ -11,7 +11,7 @@ import (
 // Writer defines the interface for persisting outbox messages.
 type Writer interface {
 	// Write inserts a message into the outbox table within the provided transaction.
-	Write(ctx context.Context, tx RowQuerier, msg *Message) (int64, error)
+	Write(ctx context.Context, tx RowQuerier, msg Message) (int64, error)
 }
 
 type writer struct {
@@ -42,7 +42,7 @@ INSERT INTO %s (
 }
 
 // Write executes the insert query using the provided transaction and message data.
-func (w writer) Write(ctx context.Context, tx RowQuerier, msg *Message) (int64, error) {
+func (w writer) Write(ctx context.Context, tx RowQuerier, msg Message) (int64, error) {
 	if tx == nil {
 		return 0, ErrTxNil
 	}

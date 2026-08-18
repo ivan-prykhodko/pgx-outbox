@@ -6,7 +6,7 @@ import (
 )
 
 type Processor interface {
-	Process(ctx context.Context, msg *Message) error
+	Process(ctx context.Context, msg Message) error
 }
 
 type defaultProcessor struct {
@@ -21,7 +21,7 @@ func NewDefaultProcessor(repo Repository, dispatcher Dispatcher) Processor {
 	}
 }
 
-func (p *defaultProcessor) Process(ctx context.Context, msg *Message) error {
+func (p *defaultProcessor) Process(ctx context.Context, msg Message) error {
 	var err error
 
 	if err = p.dispatcher.Dispatch(ctx, msg); err != nil {

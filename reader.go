@@ -28,7 +28,7 @@ func (r *pollReader) Read(ctx context.Context) (<-chan Message, error) {
 	go func() {
 		defer close(ch)
 		for _, msg := range msgs {
-			ch <- *msg
+			ch <- msg
 		}
 	}()
 

@@ -77,17 +77,17 @@ func (w *worker) process(ctx context.Context) {
 
 // doProcess retrieves messages and handles each one.
 func (w *worker) doProcess(ctx context.Context) error {
-	msgsCh, err := w.reader.Read(ctx)
+	msgCh, err := w.reader.Read(ctx)
 	if err != nil {
 		return fmt.Errorf("read messages: %w", err)
 	}
 
-	for msg := range msgsCh {
+	for msg := range msgCh {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		if err := w.processor.Process(ctx, &msg); err != nil {
+		if err := w.processor.Process(ctx, msg); err != nil {
 			return fmt.Errorf("process message %d (%s): %w", msg.ID, msg.EventType, err)
 		}
 	}

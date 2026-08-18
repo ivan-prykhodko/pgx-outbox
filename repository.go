@@ -10,7 +10,7 @@ import (
 
 type Repository interface {
 	// ClaimPending locks and returns a batch of messages to be processed.
-	ClaimPending(ctx context.Context, limit int) ([]*Message, error)
+	ClaimPending(ctx context.Context, limit int) ([]Message, error)
 	// MarkPublished marks a message as successfully published.
 	MarkPublished(ctx context.Context, id int64) error
 	// MarkFailed marks a message as failed with an error.
@@ -33,7 +33,7 @@ func NewRepository(pool *pgxpool.Pool, tableName string) Repository {
 	}
 }
 
-func (r *repository) ClaimPending(ctx context.Context, limit int) ([]*Message, error) {
+func (r *repository) ClaimPending(ctx context.Context, limit int) ([]Message, error) {
 	rows, err := r.pool.Query(ctx, r.claimPendingQuery, limit)
 	if err != nil {
 		return nil, fmt.Errorf("claim pending messages: %w", err)
@@ -41,9 +41,9 @@ func (r *repository) ClaimPending(ctx context.Context, limit int) ([]*Message, e
 	// Note: CollectRows handles rows.Close()
 
 	// TODO: compare performance pgx.CollectRows(rows, pgx.RowToAddrOfStructByName[Message])
-	msgs, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*Message, error) {
-		msg := &Message{}
-		err := row.Scan(
+	msgs, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Message, error) {
+		msg := Message{}
+		scanErr := row.Scan(
 			&msg.ID,
 			&msg.AggregateType,
 			&msg.AggregateID,
@@ -55,7 +55,7 @@ func (r *repository) ClaimPending(ctx context.Context, limit int) ([]*Message, e
 			&msg.OccurredAt,
 			&msg.CreatedAt,
 		)
-		return msg, err
+		return msg, scanErr
 	})
 	if err != nil {
 		return nil, fmt.Errorf("collect claimed messages: %w", err)
