@@ -55,7 +55,7 @@ func CreateOrder(ctx context.Context, pool *pgxpool.Pool, order Order) error {
         // ...
 
         // 2. Prepare outbox message
-        payload, _ := json.Marshal(order)
+        payload, _ := json.Marshal(domainEvent)
         msg := outbox.NewMessage(
             "Order",
             order.ID,
@@ -89,7 +89,7 @@ func startOutboxWorker(ctx context.Context, pool *pgxpool.Pool) {
     repo := outbox.NewRepository(pool)
     publisher := &MyKafkaPublisher{} // Implements outbox.Publisher
     router := outbox.NewRouter(map[string]outbox.RouteResolver{
-        outbox.RouteName("Order", "OrderCreated"): func(msg *outbox.Message) (outbox.Route, error) {
+        outbox.RouteName("Order", "OrderCreated"): func(msg outbox.Message) (outbox.Route, error) {
             return newMyRoute(
 				"order", // Topic
 			    "some-key", // Key
@@ -136,4 +136,4 @@ The worker handles transient errors (like network issues) by sleeping for a conf
 
 ## License
 
-MIT
+This project is licensed under the [LICENSE](LICENSE) file.
