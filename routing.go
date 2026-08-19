@@ -11,6 +11,8 @@ type Route interface {
 type RouteResolver func(msg Message) (Route, error)
 
 // Router resolves messages to their destination routes.
+//
+//go:generate mockery
 type Router interface {
 	// Resolve returns a route for the given message.
 	Resolve(msg Message) (Route, error)

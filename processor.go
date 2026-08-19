@@ -5,6 +5,9 @@ import (
 	"fmt"
 )
 
+// Processor processes messages from the outbox.
+//
+//go:generate mockery
 type Processor interface {
 	Process(ctx context.Context, msg Message) error
 }

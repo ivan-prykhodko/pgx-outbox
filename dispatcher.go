@@ -6,6 +6,8 @@ import (
 )
 
 // Dispatcher handles message routing and publishing.
+//
+//go:generate mockery
 type Dispatcher interface {
 	// Dispatch routes the message and publishes it using the configured publisher.
 	Dispatch(ctx context.Context, msg Message) error

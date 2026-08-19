@@ -9,6 +9,8 @@ type Envelope struct {
 }
 
 // Publisher defines the interface for sending messages to external systems.
+//
+//go:generate mockery
 type Publisher interface {
 	// Publish sends the envelope to the destination.
 	Publish(ctx context.Context, env Envelope) error

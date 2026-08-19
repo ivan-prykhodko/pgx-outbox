@@ -2,6 +2,9 @@ package outbox
 
 import "context"
 
+// Reader reads messages from the outbox.
+//
+//go:generate mockery
 type Reader interface {
 	Read(ctx context.Context) (<-chan Message, error)
 }

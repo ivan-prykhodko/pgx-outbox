@@ -1,0 +1,13 @@
+template: testify
+packages:
+  github.com/ivan-prykhodko/pgx-outbox:
+    config:
+      structname: "mock{{.InterfaceName}}"
+    interfaces:
+      Dispatcher:
+      Processor:
+      Publisher:
+      Reader:
+      Repository:
+      Router:
+      RowQuerier:
