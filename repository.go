@@ -100,7 +100,7 @@ WITH cte AS (
 	FOR UPDATE SKIP LOCKED
 	LIMIT $1
 )
-UPDATE outbox_messages m
+UPDATE %s m
 SET status = 'PROCESSING'
 FROM cte
 WHERE m.id = cte.id
@@ -115,7 +115,7 @@ RETURNING
 	m.error,
 	m.occurred_at,
 	m.created_at;
-`, tableName)
+`, tableName, tableName)
 }
 
 func getMarkPublishedQuery(tableName string) string {
