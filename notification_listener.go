@@ -14,10 +14,12 @@ type NotificationListener interface {
 	WaitForNotification(ctx context.Context, notifyCh chan<- struct{}, errCh chan<- error)
 }
 
+//go:generate mockery
 type nlConnector interface {
 	ConnectConfig(ctx context.Context, config *pgx.ConnConfig) (nlConnection, error)
 }
 
+//go:generate mockery
 type nlConnection interface {
 	WaitForNotification(ctx context.Context) (*pgconn.Notification, error)
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)

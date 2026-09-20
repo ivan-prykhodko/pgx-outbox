@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+//go:generate mockery
 type Repository interface {
 	// ClaimPending locks and returns a batch of messages to be processed.
 	ClaimPending(ctx context.Context, limit int) ([]Message, error)

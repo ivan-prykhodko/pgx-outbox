@@ -6,9 +6,12 @@ packages:
     interfaces:
       Acknowledger:
       Dispatcher:
+      nlConnection:
+      nlConnector:
       Processor:
       Provider:
       Publisher:
       Repository:
+      RetryPolicy:
       Router:
       RowQuerier:
