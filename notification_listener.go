@@ -7,10 +7,31 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type NotificationListener interface {
 	WaitForNotification(ctx context.Context, notifyCh chan<- struct{}, errCh chan<- error)
+}
+
+type nlConnector interface {
+	ConnectConfig(ctx context.Context, config *pgx.ConnConfig) (nlConnection, error)
+}
+
+type nlConnection interface {
+	WaitForNotification(ctx context.Context) (*pgconn.Notification, error)
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	Close(ctx context.Context) error
+}
+
+type pgxNLConnector struct{}
+
+func (c *pgxNLConnector) ConnectConfig(ctx context.Context, config *pgx.ConnConfig) (nlConnection, error) {
+	conn, err := pgx.ConnectConfig(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
 }
 
 type notificationListener struct {
@@ -19,6 +40,7 @@ type notificationListener struct {
 	waitingTimeout time.Duration
 	closingTimeout time.Duration
 	retryPolicy    RetryPolicy
+	connector      nlConnector
 }
 
 func NewNotificationListener(
@@ -34,11 +56,12 @@ func NewNotificationListener(
 		waitingTimeout: waitingTimeout,
 		closingTimeout: closingTimeout,
 		retryPolicy:    retryPolicy,
+		connector:      &pgxNLConnector{},
 	}
 }
 
 func (l *notificationListener) WaitForNotification(ctx context.Context, notifyCh chan<- struct{}, errCh chan<- error) {
-	var conn *pgx.Conn
+	var conn nlConnection
 
 	defer func() {
 		if conn != nil {
@@ -85,7 +108,7 @@ func (l *notificationListener) WaitForNotification(ctx context.Context, notifyCh
 	}
 }
 
-func (l *notificationListener) reconnect(ctx context.Context) (*pgx.Conn, error) {
+func (l *notificationListener) reconnect(ctx context.Context) (nlConnection, error) {
 	var lastErr error
 
 	for attempts := 0; l.retryPolicy.ShouldRetry(attempts); attempts++ {
@@ -96,7 +119,7 @@ func (l *notificationListener) reconnect(ctx context.Context) (*pgx.Conn, error)
 			}
 		}
 
-		conn, err := pgx.ConnectConfig(ctx, l.connConfig)
+		conn, err := l.connector.ConnectConfig(ctx, l.connConfig)
 		if err != nil {
 			lastErr = fmt.Errorf("failed to connect: %w", err)
 			continue
@@ -114,14 +137,14 @@ func (l *notificationListener) reconnect(ctx context.Context) (*pgx.Conn, error)
 	return nil, fmt.Errorf("reconnect attempts exhausted: %w", lastErr)
 }
 
-func (l *notificationListener) listen(ctx context.Context, conn *pgx.Conn) error {
+func (l *notificationListener) listen(ctx context.Context, conn nlConnection) error {
 	channel := pgx.Identifier{l.listenChannel}.Sanitize()
 	_, err := conn.Exec(ctx, "LISTEN "+channel)
 
 	return err
 }
 
-func (l *notificationListener) disconnect(ctx context.Context, conn *pgx.Conn) error {
+func (l *notificationListener) disconnect(ctx context.Context, conn nlConnection) error {
 	closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), l.closingTimeout)
 	defer cancel()
 
