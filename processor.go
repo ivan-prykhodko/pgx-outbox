@@ -9,7 +9,7 @@ import (
 //
 //go:generate mockery
 type Processor interface {
-	Process(ctx context.Context, msg *Message) error
+	Process(ctx context.Context, delivery *Delivery) error
 }
 
 type defaultProcessor struct {
@@ -24,8 +24,11 @@ func NewDefaultProcessor(dispatcher Dispatcher, acknowledger Acknowledger) Proce
 	}
 }
 
-func (p *defaultProcessor) Process(ctx context.Context, msg *Message) error {
+func (p *defaultProcessor) Process(ctx context.Context, delivery *Delivery) error {
+	defer delivery.Ack()
+
 	var err error
+	msg := &delivery.Message
 
 	if err = p.dispatcher.Dispatch(ctx, msg); err != nil {
 		if isRetryable(err) {

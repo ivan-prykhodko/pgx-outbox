@@ -12,6 +12,7 @@ type Delivery struct {
 	Ack     func()
 }
 
+//go:generate mockery
 type Provider interface {
 	Provide(ctx context.Context) (<-chan Delivery, <-chan error)
 }

@@ -44,9 +44,7 @@ func (w *worker) Run(ctx context.Context) error {
 }
 
 func (w *worker) process(ctx context.Context, delivery *Delivery) error {
-	defer delivery.Ack()
-
-	if err := w.processor.Process(ctx, &delivery.Message); err != nil {
+	if err := w.processor.Process(ctx, delivery); err != nil {
 		return fmt.Errorf("process message %d of type %s: %w", delivery.Message.ID, delivery.Message.EventType, err)
 	}
 

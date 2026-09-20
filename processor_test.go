@@ -19,9 +19,15 @@ func TestDefaultProcessor_Process(t *testing.T) {
 		dispatcher.On("Dispatch", ctx, &msg).Return(nil)
 		acknowledger.On("Ack", ctx, msg.ID).Return(nil)
 
-		err := p.Process(ctx, &msg)
+		acked := false
+		delivery := Delivery{
+			Message: msg,
+			Ack:     func() { acked = true },
+		}
+		err := p.Process(ctx, &delivery)
 
 		assert.NoError(t, err)
+		assert.True(t, acked)
 		dispatcher.AssertExpectations(t)
 		acknowledger.AssertExpectations(t)
 	})
@@ -35,9 +41,15 @@ func TestDefaultProcessor_Process(t *testing.T) {
 		dispatcher.On("Dispatch", ctx, &msg).Return(dispatchErr)
 		acknowledger.On("Nack", ctx, msg.ID, dispatchErr).Return(nil)
 
-		err := p.Process(ctx, &msg)
+		acked := false
+		delivery := Delivery{
+			Message: msg,
+			Ack:     func() { acked = true },
+		}
+		err := p.Process(ctx, &delivery)
 
 		assert.NoError(t, err) // Nack consumes the error and returns nil
+		assert.True(t, acked)
 		dispatcher.AssertExpectations(t)
 		acknowledger.AssertExpectations(t)
 	})
@@ -50,9 +62,15 @@ func TestDefaultProcessor_Process(t *testing.T) {
 		retryableErr := ErrNetwork
 		dispatcher.On("Dispatch", ctx, &msg).Return(retryableErr)
 
-		err := p.Process(ctx, &msg)
+		acked := false
+		delivery := Delivery{
+			Message: msg,
+			Ack:     func() { acked = true },
+		}
+		err := p.Process(ctx, &delivery)
 
 		assert.ErrorIs(t, err, retryableErr)
+		assert.True(t, acked)
 		dispatcher.AssertExpectations(t)
 		acknowledger.AssertNotCalled(t, "Nack", mock.Anything, mock.Anything, mock.Anything)
 		acknowledger.AssertNotCalled(t, "Ack", mock.Anything, mock.Anything)
@@ -66,9 +84,15 @@ func TestDefaultProcessor_Process(t *testing.T) {
 		dispatcher.On("Dispatch", ctx, &msg).Return(nil)
 		acknowledger.On("Ack", ctx, msg.ID).Return(assert.AnError)
 
-		err := p.Process(ctx, &msg)
+		acked := false
+		delivery := Delivery{
+			Message: msg,
+			Ack:     func() { acked = true },
+		}
+		err := p.Process(ctx, &delivery)
 
 		assert.ErrorIs(t, err, assert.AnError)
+		assert.True(t, acked)
 		assert.Contains(t, err.Error(), "mark published")
 		dispatcher.AssertExpectations(t)
 		acknowledger.AssertExpectations(t)
