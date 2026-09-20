@@ -11,10 +11,6 @@ import (
 type Repository interface {
 	// ClaimPending locks and returns a batch of messages to be processed.
 	ClaimPending(ctx context.Context, limit int) ([]Message, error)
-	// MarkPublished marks a message as successfully published.
-	MarkPublished(ctx context.Context, id int64) error
-	// MarkFailed marks a message as failed with an error.
-	MarkFailed(ctx context.Context, id int64, errMsg error) error
 }
 
 type repository struct {
@@ -64,7 +60,7 @@ func (r *repository) ClaimPending(ctx context.Context, limit int) ([]Message, er
 	return msgs, nil
 }
 
-func (r *repository) MarkPublished(ctx context.Context, id int64) error {
+func (r *repository) Ack(ctx context.Context, id int64) error {
 	tag, err := r.pool.Exec(ctx, r.markPublishedQuery, id)
 	if err != nil {
 		return fmt.Errorf("mark published: %w", err)
@@ -77,7 +73,7 @@ func (r *repository) MarkPublished(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (r *repository) MarkFailed(ctx context.Context, id int64, errMsg error) error {
+func (r *repository) Nack(ctx context.Context, id int64, errMsg error) error {
 	tag, err := r.pool.Exec(ctx, r.markFailedQuery, id, errMsg.Error())
 	if err != nil {
 		return fmt.Errorf("mark failed: %w", err)
@@ -99,22 +95,39 @@ WITH cte AS (
 	ORDER BY occurred_at ASC
 	FOR UPDATE SKIP LOCKED
 	LIMIT $1
+), updated AS (
+	UPDATE %s m
+	SET status = 'PROCESSING'
+	FROM cte
+	WHERE m.id = cte.id
+	RETURNING 
+		m.id,
+		m.aggregate_type,
+		m.aggregate_id,
+		m.event_type,
+		m.payload,
+		m.metadata,
+		m.status,
+		m.error,
+		m.occurred_at,
+		m.created_at
 )
-UPDATE %s m
-SET status = 'PROCESSING'
-FROM cte
-WHERE m.id = cte.id
-RETURNING 
-	m.id,
-	m.aggregate_type,
-	m.aggregate_id,
-	m.event_type,
-	m.payload,
-	m.metadata,
-	m.status,
-	m.error,
-	m.occurred_at,
-	m.created_at;
+SELECT
+	u.id,
+	u.aggregate_type,
+	u.aggregate_id,
+	u.event_type,
+	u.payload,
+	u.metadata,
+	u.status,
+	u.error,
+	u.occurred_at,
+	u.created_at 
+FROM
+	updated u 
+ORDER BY
+    occurred_at ASC
+;
 `, tableName, tableName)
 }
 

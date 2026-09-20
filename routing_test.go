@@ -25,10 +25,10 @@ func TestRouter_Resolve(t *testing.T) {
 	route2 := mockRoute{data: map[string]any{"queue": "users"}}
 
 	resolvers := map[string]RouteResolver{
-		"order.created": func(msg Message) (Route, error) {
+		"order.created": func(msg *Message) (Route, error) {
 			return route1, nil
 		},
-		"user.updated": func(msg Message) (Route, error) {
+		"user.updated": func(msg *Message) (Route, error) {
 			return route2, nil
 		},
 	}
@@ -36,14 +36,14 @@ func TestRouter_Resolve(t *testing.T) {
 	r := NewRouter(resolvers)
 
 	t.Run("resolves known route", func(t *testing.T) {
-		msg := Message{AggregateType: "order", EventType: "created"}
+		msg := &Message{AggregateType: "order", EventType: "created"}
 		route, err := r.Resolve(msg)
 		require.NoError(t, err)
 		assert.Equal(t, route1, route)
 	})
 
 	t.Run("returns error for unknown route", func(t *testing.T) {
-		msg := Message{AggregateType: "product", EventType: "deleted"}
+		msg := &Message{AggregateType: "product", EventType: "deleted"}
 		route, err := r.Resolve(msg)
 		assert.Error(t, err)
 		assert.Nil(t, route)
@@ -53,12 +53,12 @@ func TestRouter_Resolve(t *testing.T) {
 	t.Run("returns error if resolver fails", func(t *testing.T) {
 		expectedErr := assert.AnError
 		r := NewRouter(map[string]RouteResolver{
-			"order.failed": func(msg Message) (Route, error) {
+			"order.failed": func(msg *Message) (Route, error) {
 				return nil, expectedErr
 			},
 		})
 
-		msg := Message{AggregateType: "order", EventType: "failed"}
+		msg := &Message{AggregateType: "order", EventType: "failed"}
 		route, err := r.Resolve(msg)
 		assert.ErrorIs(t, err, expectedErr)
 		assert.Nil(t, route)

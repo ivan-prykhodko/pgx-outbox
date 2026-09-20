@@ -4,10 +4,10 @@ packages:
     config:
       structname: "mock{{.InterfaceName}}"
     interfaces:
+      Acknowledger:
       Dispatcher:
       Processor:
       Publisher:
-      Reader:
       Repository:
       Router:
       RowQuerier:

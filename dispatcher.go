@@ -10,7 +10,7 @@ import (
 //go:generate mockery
 type Dispatcher interface {
 	// Dispatch routes the message and publishes it using the configured publisher.
-	Dispatch(ctx context.Context, msg Message) error
+	Dispatch(ctx context.Context, msg *Message) error
 }
 
 type dispatcher struct {
@@ -25,13 +25,13 @@ func NewDispatcher(publisher Publisher, router Router) Dispatcher {
 	}
 }
 
-func (d *dispatcher) Dispatch(ctx context.Context, msg Message) error {
+func (d *dispatcher) Dispatch(ctx context.Context, msg *Message) error {
 	env, err := d.buildEnvelope(msg)
 	if err != nil {
 		return fmt.Errorf("build envelope: %w", err)
 	}
 
-	if err := d.publisher.Publish(ctx, env); err != nil {
+	if err := d.publisher.Publish(ctx, &env); err != nil {
 		return fmt.Errorf(
 			"dispatch message id=%d event=%s route=%v: %w",
 			msg.ID,
@@ -45,7 +45,7 @@ func (d *dispatcher) Dispatch(ctx context.Context, msg Message) error {
 }
 
 // buildEnvelope resolves the route and wraps the message into an envelope.
-func (d *dispatcher) buildEnvelope(msg Message) (Envelope, error) {
+func (d *dispatcher) buildEnvelope(msg *Message) (Envelope, error) {
 	route, err := d.router.Resolve(msg)
 	if err != nil {
 		return Envelope{}, fmt.Errorf("resolve route for message: %w", err)
@@ -53,6 +53,6 @@ func (d *dispatcher) buildEnvelope(msg Message) (Envelope, error) {
 
 	return Envelope{
 		Route:   route,
-		Message: msg,
+		Message: *msg,
 	}, nil
 }

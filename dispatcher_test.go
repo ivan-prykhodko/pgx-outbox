@@ -8,9 +8,9 @@ import (
 
 func TestDispatcher_Dispatch(t *testing.T) {
 	ctx := t.Context()
-	msg := Message{ID: 1, AggregateType: "order", EventType: "created"}
+	msg := &Message{ID: 1, AggregateType: "order", EventType: "created"}
 	route := mockRoute{data: map[string]any{"target": "queue1"}}
-	env := Envelope{Route: route, Message: msg}
+	env := Envelope{Route: route, Message: *msg}
 
 	t.Run("successfully dispatches message", func(t *testing.T) {
 		publisher := newMockPublisher(t)
@@ -18,7 +18,7 @@ func TestDispatcher_Dispatch(t *testing.T) {
 		d := NewDispatcher(publisher, router)
 
 		router.On("Resolve", msg).Return(route, nil)
-		publisher.On("Publish", ctx, env).Return(nil)
+		publisher.On("Publish", ctx, &env).Return(nil)
 
 		err := d.Dispatch(ctx, msg)
 
@@ -47,7 +47,7 @@ func TestDispatcher_Dispatch(t *testing.T) {
 		d := NewDispatcher(publisher, router)
 
 		router.On("Resolve", msg).Return(route, nil)
-		publisher.On("Publish", ctx, env).Return(assert.AnError)
+		publisher.On("Publish", ctx, &env).Return(assert.AnError)
 
 		err := d.Dispatch(ctx, msg)
 

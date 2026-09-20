@@ -13,5 +13,5 @@ type Envelope struct {
 //go:generate mockery
 type Publisher interface {
 	// Publish sends the envelope to the destination.
-	Publish(ctx context.Context, env Envelope) error
+	Publish(ctx context.Context, env *Envelope) error
 }

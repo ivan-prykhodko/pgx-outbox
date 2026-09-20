@@ -9,22 +9,22 @@ import (
 //
 //go:generate mockery
 type Processor interface {
-	Process(ctx context.Context, msg Message) error
+	Process(ctx context.Context, msg *Message) error
 }
 
 type defaultProcessor struct {
-	repo       Repository
-	dispatcher Dispatcher
+	dispatcher   Dispatcher
+	acknowledger Acknowledger
 }
 
-func NewDefaultProcessor(repo Repository, dispatcher Dispatcher) Processor {
+func NewDefaultProcessor(dispatcher Dispatcher, acknowledger Acknowledger) Processor {
 	return &defaultProcessor{
-		repo:       repo,
-		dispatcher: dispatcher,
+		dispatcher:   dispatcher,
+		acknowledger: acknowledger,
 	}
 }
 
-func (p *defaultProcessor) Process(ctx context.Context, msg Message) error {
+func (p *defaultProcessor) Process(ctx context.Context, msg *Message) error {
 	var err error
 
 	if err = p.dispatcher.Dispatch(ctx, msg); err != nil {
@@ -34,10 +34,10 @@ func (p *defaultProcessor) Process(ctx context.Context, msg Message) error {
 
 		// TODO: retry strategy on serialization error?
 
-		return p.repo.MarkFailed(ctx, msg.ID, err)
+		return p.acknowledger.Nack(ctx, msg.ID, err)
 	}
 
-	if err = p.repo.MarkPublished(ctx, msg.ID); err != nil {
+	if err = p.acknowledger.Ack(ctx, msg.ID); err != nil {
 		return fmt.Errorf("mark published: %w", err)
 	}
 
