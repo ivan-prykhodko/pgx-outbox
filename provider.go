@@ -3,6 +3,7 @@ package outbox
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync/atomic"
 	"time"
 )
@@ -118,13 +119,18 @@ func (p *provider) pollMessages(ctx context.Context, deliveryCh chan<- Delivery)
 		return 0, err
 	}
 
-	if len(messages) == 0 {
+	n := len(messages)
+	if n > math.MaxInt32 {
+		return 0, fmt.Errorf("too many messages: %d", n)
+	}
+
+	if n == 0 {
 		return 0, nil
 	}
 
 	done := make(chan struct{})
 	var remaining atomic.Int32
-	remaining.Store(int32(len(messages)))
+	remaining.Store(int32(n))
 
 	for i, msg := range messages {
 		delivery := Delivery{
