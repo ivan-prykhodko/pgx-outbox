@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -29,7 +30,12 @@ func main() {
 	done := make(chan os.Signal, 1)
 
 	worker := newWorker(pgxClient)
-	go worker.Run(ctx)
+	var workerErr chan error
+	go func() {
+		if wErr := worker.Run(ctx); wErr != nil {
+			workerErr <- wErr
+		}
+	}()
 
 	writer := newWriter()
 	err = populate(ctx, pgxClient, writer)
@@ -38,7 +44,13 @@ func main() {
 		return
 	}
 
-	<-done
+	select {
+	case err := <-workerErr:
+		if err != nil {
+			log.Println(err)
+		}
+	case <-done:
+	}
 
 	fmt.Println("Bye!")
 }
@@ -52,6 +64,13 @@ func newPgxClient(ctx context.Context) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
+	//logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	//config.ConnConfig.Tracer = &tracelog.TraceLog{
+	//	Logger: tracelog.LoggerFunc(func(ctx context.Context, level tracelog.LogLevel, msg string, data map[string]any) {
+	//		logger.Log(ctx, slog.LevelInfo, msg, "level", level.String(), "data", data)
+	//	}),
+	//	LogLevel: tracelog.LogLevelInfo,
+	//}
 
 	return pgxpool.NewWithConfig(ctx, config)
 }
@@ -77,8 +96,8 @@ func (r *route) Data() map[string]any {
 
 type outputPublisher struct{}
 
-func (o *outputPublisher) Publish(ctx context.Context, env outbox.Envelope) error {
-	fmt.Printf("Publish envelope: %+v\n", env)
+func (o *outputPublisher) Publish(ctx context.Context, env *outbox.Envelope) error {
+	fmt.Printf("publish: %v\n", *env)
 	return nil
 }
 
@@ -86,12 +105,8 @@ func newRepository(pool *pgxpool.Pool) outbox.Repository {
 	return outbox.NewRepository(pool, TableName)
 }
 
-func newReader(repo outbox.Repository) outbox.Reader {
-	return outbox.NewPollReader(repo, 5)
-}
-
-func newProcessor(repo outbox.Repository) outbox.Processor {
-	orderRouteResolver := func(msg outbox.Message) (outbox.Route, error) {
+func newProcessor(acknowledger outbox.Acknowledger) outbox.Processor {
+	orderRouteResolver := func(msg *outbox.Message) (outbox.Route, error) {
 		return newRoute(
 			"order",
 			"",
@@ -105,15 +120,30 @@ func newProcessor(repo outbox.Repository) outbox.Processor {
 	publisher := &outputPublisher{}
 	dispatcher := outbox.NewDispatcher(publisher, router)
 
-	return outbox.NewDefaultProcessor(repo, dispatcher)
+	return outbox.NewDefaultProcessor(dispatcher, acknowledger)
 }
 
 func newWorker(pool *pgxpool.Pool) outbox.Worker {
-	repo := newRepository(pool)
-	reader := newReader(repo)
-	processor := newProcessor(repo)
+	poolConfig := pool.Config()
 
-	return outbox.NewWorker(reader, processor, 5*time.Second, 5*time.Second, nil)
+	repo := newRepository(pool)
+
+	nl := outbox.NewNotificationListener(
+		poolConfig.ConnConfig,
+		"outbox_events",
+		30*time.Second,
+		3*time.Second,
+		outbox.NewRetryPolicy(
+			outbox.NewBackoff(time.Second, 30*time.Second, 2),
+			3,
+		),
+	)
+
+	provider := outbox.NewProvider(repo, nl, 5*time.Second, 5)
+
+	processor := newProcessor(repo.(outbox.Acknowledger))
+
+	return outbox.NewWorker(provider, processor)
 }
 
 // Population data services
@@ -141,31 +171,31 @@ func createMessage(event orderCreatedEvent) outbox.Message {
 	)
 }
 
-var eventId int64 = 1
+var eventId atomic.Int64
 
 func populateSome(ctx context.Context, pool *pgxpool.Pool, writer outbox.Writer) error {
 	return pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
 		msg := createMessage(orderCreatedEvent{
-			eventId,
+			eventId.Load(),
 			"100501",
-			time.Now().UTC().Format(time.RFC3339),
+			time.Now().UTC().Format(time.RFC3339Nano),
 			"order.created",
 		})
-		eventId++
+		eventId.Add(1)
 
-		id, err := writer.Write(ctx, tx, msg)
+		_, err := writer.Write(ctx, tx, &msg)
 		if err != nil {
 			return err
 		}
-
-		fmt.Printf("Message %d written\n", id)
 
 		return nil
 	})
 }
 
 func populate(ctx context.Context, pool *pgxpool.Pool, writer outbox.Writer) error {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(1000 * time.Millisecond)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
